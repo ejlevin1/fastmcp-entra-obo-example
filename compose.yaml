@@ -1,0 +1,41 @@
+# Setup: cp .env.example .env (or run scripts/create_app_registration.sh), then:
+#   docker compose up --build
+x-common: &common
+  build: .
+  image: fastmcp-entra-obo-example # one image shared by both services
+  env_file: .env
+  environment: &env
+    HOST: 0.0.0.0 # bind all interfaces inside the container (bare-metal default is loopback)
+
+services:
+  downstream-api:
+    <<: *common
+    command: python downstream_api.py
+    environment:
+      <<: *env
+      API_CLIENT_ID: ${API_CLIENT_ID:-00000000-0000-0000-0000-000000000000} # API needs one to start
+    ports: ["8001:8001"]
+    healthcheck: # no token -> 401 proves the app is up and enforcing auth
+      test: ["CMD", "python", "-c", "import sys,urllib.request as u,urllib.error as e\ntry: u.urlopen('http://localhost:8001/api/profile')\nexcept e.HTTPError as x: sys.exit(x.code != 401)"]
+      interval: 5s
+      retries: 12
+
+  mcp-server:
+    <<: *common
+    environment:
+      <<: *env
+      DOWNSTREAM_API_URL: http://downstream-api:8001 # service name; overrides .env
+      # BASE_URL stays as in .env (http://localhost:8000): the browser and MCP client use the host port.
+    ports: ["8000:8000"]
+    volumes:
+      - oauth-state:/data # FastMCP OAuth proxy storage (FASTMCP_HOME); survives restarts
+    depends_on:
+      downstream-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/.well-known/oauth-protected-resource/mcp')"]
+      interval: 5s
+      retries: 12
+
+volumes:
+  oauth-state:

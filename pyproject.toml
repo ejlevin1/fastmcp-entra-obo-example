@@ -1,0 +1,36 @@
+[project]
+name = "fastmcp-entra-obo-example"
+version = "0.1.0"
+description = "Minimal FastMCP + Microsoft Entra ID On-Behalf-Of example"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Pinned exactly: this example relies on AzureProvider sending only this server's scope (+ OIDC
+    # scopes) at code redemption and refresh, so other resources' scopes can sit in
+    # additional_authorize_scopes (providers/azure.py _prepare_scopes_for_token_exchange /
+    # _prepare_scopes_for_upstream_refresh). That is implementation behaviour, not a documented
+    # contract: re-check it before bumping.
+    "fastmcp[azure]==4.1.8",
+    "pyjwt[crypto]>=2.10",
+    "python-dotenv>=1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastMCP dependencies are declared as parameter defaults by design.
+extend-immutable-calls = [
+    "fastmcp.dependencies.CurrentAccessToken",
+    "fastmcp.server.auth.providers.azure.EntraOBOToken",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
